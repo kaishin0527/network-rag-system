@@ -1,6 +1,3 @@
-
-
-
 # Network RAG System
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
@@ -22,14 +19,14 @@ Network RAG Systemは、Retrieval-Augmented Generation（RAG）技術を活用�
 
 ### 基本的なインストール
 ```bash
-git clone https://github.com/your-org/network-rag-system.git
+git clone https://github.com/kaishin0527/network-rag-system.git
 cd network-rag-system
 pip install -r requirements/base.txt
 ```
 
 ### 開発環境のセットアップ
 ```bash
-git clone https://github.com/your-org/network-rag-system.git
+git clone https://github.com/kaishin0527/network-rag-system.git
 cd network-rag-system
 pip install -r requirements/dev.txt
 pre-commit install
@@ -170,9 +167,5 @@ flake8 src/ examples/ tests/
 ## 📞 お問い合わせ
 
 - 📧 Email: team@network-rag.com
-- 🐛 Issues: [GitHub Issues](https://github.com/your-org/network-rag-system/issues)
-- 📖 Documentation: [GitHub Pages](https://your-org.github.io/network-rag-system)
-
-
-
-
+- 🐛 Issues: [GitHub Issues](https://github.com/kaishin0527/network-rag-system/issues)
+- 📖 Documentation: [GitHub Pages](https://kaishin0527.github.io/network-rag-system)
