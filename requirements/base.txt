@@ -1,0 +1,9 @@
+
+
+# Base dependencies for Network RAG System
+PyYAML>=6.0
+markdown>=3.4.3
+pathlib2>=2.3.7
+typing-extensions>=4.8.0
+
+

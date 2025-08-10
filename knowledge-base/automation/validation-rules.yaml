@@ -1,0 +1,44 @@
+
+# validation-rules.yaml
+validation_rules:
+  # IPアドレス検証ルール
+  ip_validation:
+    - pattern: "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}$"
+      message: "Invalid IP address format"
+    - check_private: true
+      message: "IP address must be private"
+  
+  # サブネット検証ルール
+  subnet_validation:
+    - min_prefix: 16
+      max_prefix: 30
+      message: "Subnet prefix must be between 16 and 30"
+  
+  # OSPF検証ルール
+  ospf_validation:
+    - required_areas: [0]
+      message: "Area 0 is required"
+    - max_areas: 10
+      message: "Maximum 10 areas allowed"
+  
+  # ACL検証ルール
+  acl_validation:
+    - standard_acl_range: [1-99]
+      message: "Standard ACL must be in range 1-99"
+    - extended_acl_range: [100-199]
+      message: "Extended ACL must be in range 100-199"
+  
+  # デバイス固有検証ルール
+  device_validation:
+    router:
+      - required_interfaces: ["Loopback0", "GigabitEthernet0/0"]
+        message: "Router required interfaces missing"
+      - max_interfaces: 100
+        message: "Maximum 100 interfaces allowed"
+    
+    switch:
+      - required_interfaces: ["Vlan1", "Loopback0"]
+        message: "Switch required interfaces missing"
+      - max_vlans: 1000
+        message: "Maximum 1000 VLANs allowed"
+

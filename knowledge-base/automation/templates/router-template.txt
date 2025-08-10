@@ -1,0 +1,31 @@
+
+! {{hostname}} - Router Configuration Template
+! Generated based on network policy
+! Requirements: {{requirements}}
+
+! Basic Settings
+hostname {{hostname}}
+ip routing
+{{basic_settings}}
+
+! Interface Configuration
+{{interfaces}}
+
+! OSPF Configuration
+router ospf 1
+ router-id {{router_id}}
+{{ospf_networks}}
+ passive-interface default
+ no passive-interface {{active_interfaces}}
+
+! Security Configuration
+{{security_settings}}
+
+! High Availability
+{{ha_settings}}
+
+! Monitoring Configuration
+{{monitoring_settings}}
+
+
+
