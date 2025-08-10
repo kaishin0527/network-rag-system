@@ -405,6 +405,581 @@ isort src/ examples/ tests/
 flake8 src/ examples/ tests/
 ```
 
+## 🚀 デプロイガイド
+
+### Ubuntuへのデプロイ手順
+
+#### 1. 環境準備
+
+##### 1.1 システムの更新
+```bash
+# システムの更新
+sudo apt update && sudo apt upgrade -y
+
+# 基本的なツールのインストール
+sudo apt install -y curl wget git vim unzip htop
+
+# Pythonとpipのインストール
+sudo apt install -y python3 python3-pip python3-venv
+
+# Pythonパッケージのアップグレード
+pip3 install --upgrade pip
+```
+
+##### 1.2 仮想環境の作成
+```bash
+# プロジェクトディレクトリの作成
+sudo mkdir -p /opt/network-rag-system
+sudo chown -R $USER:$USER /opt/network-rag-system
+cd /opt/network-rag-system
+
+# リポジトリのクローン
+git clone https://github.com/kaishin0527/network-rag-system.git .
+
+# 仮想環境の作成
+python3 -m venv venv
+source venv/bin/activate
+
+# 仮想環境を有効化するためのスクリプト作成
+echo 'source /opt/network-rag-system/venv/bin/activate' | sudo tee /etc/profile.d/network-rag-env.sh
+sudo chmod +x /etc/profile.d/network-rag-env.sh
+```
+
+#### 2. 依存関係のインストール
+
+##### 2.1 基本的な依存関係
+```bash
+# Network RAG Systemの依存関係
+pip install -r requirements/base.txt
+
+# OpenHands関連の依存関係
+pip install openhands requests fastapi uvicorn paramiko
+
+# 追加の依存関係
+pip install pyyaml markdown pathlib2 typing-extensions
+```
+
+##### 2.2 ディレクトリ構造の作成
+```bash
+# 必要なディレクトリの作成
+sudo mkdir -p /var/log/network-rag-system
+sudo mkdir -p /etc/network-rag-system
+sudo mkdir -p /var/lib/network-rag-system/backups
+sudo mkdir -p /var/lib/network-rag-system/temp
+
+# パーミッションの設定
+sudo chown -R $USER:$USER /var/log/network-rag-system
+sudo chown -R $USER:$USER /etc/network-rag-system
+sudo chown -R $USER:$USER /var/lib/network-rag-system
+```
+
+#### 3. 設定ファイルの作成
+
+##### 3.1 Network RAG System設定
+```bash
+# 基本的な設定ファイルを作成
+sudo tee /etc/network-rag-system/config.yml > /dev/null << 'EOF'
+# Network RAG System Configuration
+version: 1.0.0
+
+# Database Settings
+database:
+  type: sqlite
+  path: /var/lib/network-rag-system/network_rag.db
+
+# Logging Settings
+logging:
+  level: INFO
+  file: /var/log/network-rag-system/app.log
+  max_size: 10MB
+  backup_count: 5
+
+# API Settings
+api:
+  host: 0.0.0.0
+  port: 8000
+  debug: false
+
+# OpenHands Integration
+openhands:
+  enabled: true
+  api_url: http://localhost:8001
+  api_key: your-api-key-here
+  timeout: 30
+  max_retries: 3
+
+# Auto Update Settings
+auto_update:
+  enabled: true
+  interval: 3600  # 1 hour
+  batch_size: 5
+  max_retries: 3
+  timeout: 300
+
+# SSH Settings for device access
+ssh:
+  default_timeout: 30
+  default_port: 22
+  key_file: /etc/network-rag-system/ssh_key
+  known_hosts: /etc/network-rag-system/known_hosts
+
+# Security
+security:
+  enable_auth: true
+  secret_key: your-secret-key-here
+  jwt_expiry: 24h
+EOF
+```
+
+##### 3.2 OpenHands設定
+```bash
+# OpenHands設定ディレクトリの作成
+mkdir -p ~/.openhands
+
+# OpenHands設定ファイルを作成
+tee ~/.openhands/config.yml > /dev/null << 'EOF'
+# OpenHands Configuration
+version: 1.0.0
+
+# Agent Settings
+agent:
+  name: network-rag-agent
+  type: network
+  max_iterations: 100
+  timeout: 300
+
+# LLM Integration
+llm:
+  provider: openai
+  model: gpt-4
+  api_key: your-llm-api-key
+  base_url: http://localhost:8000
+
+# Network Settings
+network:
+  rag_system_path: /opt/network-rag-system
+  knowledge_base_path: /opt/network-rag-system/knowledge-base
+  temp_dir: /var/lib/network-rag-system/temp
+
+# Logging
+logging:
+  level: INFO
+  file: /var/log/network-rag-system/openhands.log
+EOF
+```
+
+#### 4. サービスの作成
+
+##### 4.1 サービススクリプトの作成
+```bash
+# Network RAG Systemサービススクリプト
+tee /opt/network-rag-system/start_service.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Network RAG System Service Startup Script
+
+cd /opt/network-rag-system
+source venv/bin/activate
+
+# Network RAG System APIサーバーを起動
+nohup python -m fastapi src.api:app --host 0.0.0.0 --port 8000 > /var/log/network-rag-system/rag_api.log 2>&1 &
+RAG_API_PID=$!
+
+# KBアップdaterサービスを起動
+nohup python auto_kb_updater.py > /var/log/network-rag-system/kb_updater.log 2>&1 &
+KB_UPDATER_PID=$!
+
+echo $RAG_API_PID > /var/run/network-rag-api.pid
+echo $KB_UPDATER_PID > /var/run/network-rag-updater.pid
+
+echo "Network RAG System services started"
+echo "RAG API PID: $RAG_API_PID"
+echo "KB Updater PID: $KB_UPDATER_PID"
+EOF
+
+chmod +x /opt/network-rag-system/start_service.sh
+
+# OpenHandsサービススクリプト
+sudo mkdir -p /opt/openhands
+sudo chown -R $USER:$USER /opt/openhands
+
+tee /opt/openhands/start_service.sh > /dev/null << 'EOF'
+#!/bin/bash
+# OpenHands Service Startup Script
+
+cd /opt/openhands
+source /opt/network-rag-system/venv/bin/activate
+
+# OpenHandsサービスをバックグラウンドで実行
+nohup python -m openhands.server --config ~/.openhands/config.yml > /var/log/network-rag-system/openhands.log 2>&1 &
+OPENHANDS_PID=$!
+
+echo $OPENHANDS_PID > /var/run/openhands.pid
+
+echo "OpenHands service started with PID: $OPENHANDS_PID"
+EOF
+
+chmod +x /opt/openhands/start_service.sh
+```
+
+##### 4.2 systemdサービスの作成
+```bash
+# Network RAG Systemサービス用のsystemdファイル
+sudo tee /etc/systemd/system/network-rag-system.service > /dev/null << 'EOF'
+[Unit]
+Description=Network RAG System
+After=network.target
+Wants=network.target
+
+[Service]
+Type=forking
+User=root
+WorkingDirectory=/opt/network-rag-system
+ExecStart=/opt/network-rag-system/start_service.sh
+ExecStop=/bin/kill -TERM $(cat /var/run/network-rag-api.pid) $(cat /var/run/network-rag-updater.pid)
+ExecReload=/bin/kill -HUP $(cat /var/run/network-rag-api.pid) $(cat /var/run/network-rag-updater.pid)
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# OpenHandsサービス用のsystemdファイル
+sudo tee /etc/systemd/system/openhands.service > /dev/null << 'EOF'
+[Unit]
+Description=OpenHands Service
+After=network.target network-rag-system.service
+Wants=network.target
+
+[Service]
+Type=forking
+User=root
+WorkingDirectory=/opt/openhands
+ExecStart=/opt/openhands/start_service.sh
+ExecStop=/bin/kill -TERM $(cat /var/run/openhands.pid)
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+#### 5. ファイアウォール設定
+
+```bash
+# ファイアウォールの設定
+sudo ufw allow 22/tcp    # SSH
+sudo ufw allow 8000/tcp  # Network RAG API
+sudo ufw allow 8001/tcp  # OpenHands API
+sudo ufw allow 8080/tcp  # Web UI (if needed)
+
+# ファイアウォールの有効化
+sudo ufw --force enable
+```
+
+#### 6. サービスの起動
+
+##### 6.1 サービスの有効化と起動
+```bash
+# systemdサービスのリロード
+sudo systemctl daemon-reload
+
+# Network RAG Systemサービスの有効化と起動
+sudo systemctl enable network-rag-system
+sudo systemctl start network-rag-system
+
+# OpenHandsサービスの有効化と起動
+sudo systemctl enable openhands
+sudo systemctl start openhands
+
+# サービスの状態確認
+sudo systemctl status network-rag-system
+sudo systemctl status openhands
+```
+
+##### 6.2 動作確認
+```bash
+# Network RAG System APIの確認
+curl -X GET "http://localhost:8000/health" -H "accept: application/json"
+
+# OpenHands APIの確認
+curl -X GET "http://localhost:8001/health" -H "accept: application/json"
+
+# KB更新機能のテスト
+cat > /tmp/test_config.json << 'EOF'
+{
+  "device_name": "TEST-R1",
+  "config_type": "running_config",
+  "config_content": "! Test Configuration\nhostname TEST-R1\nip routing\ninterface GigabitEthernet0/0\n ip address 192.168.1.1 255.255.255.0\n no shutdown\nend",
+  "metadata": {
+    "source": "test",
+    "backup_date": "2025-01-10",
+    "admin": "test-admin"
+  }
+}
+EOF
+
+python run_kb_update.py --mode manual --input /tmp/test_config.json --report
+```
+
+#### 7. 便利なスクリプトの作成
+
+##### 7.1 デプロイスクリプト
+```bash
+# デプロイスクリプト
+sudo mkdir -p /opt/network-rag-system/deploy
+sudo chown -R $USER:$USER /opt/network-rag-system/deploy
+
+tee /opt/network-rag-system/deploy/deploy.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Complete Deployment Script
+
+echo "Starting Network RAG System deployment..."
+
+# 仮想環境の有効化
+source /opt/network-rag-system/venv/bin/activate
+cd /opt/network-rag-system
+
+# サービスの起動
+sudo systemctl start network-rag-system
+sudo systemctl start openhands
+
+# サービスの状態確認
+echo "Checking service status..."
+sudo systemctl status network-rag-system --no-pager -l
+sudo systemctl status openhands --no-pager -l
+
+# APIの動作確認
+echo "Checking API connectivity..."
+curl -s http://localhost:8000/health > /dev/null && echo "✓ Network RAG API is running" || echo "✗ Network RAG API is not running"
+curl -s http://localhost:8001/health > /dev/null && echo "✓ OpenHands API is running" || echo "✗ OpenHands API is not running"
+
+echo "Deployment completed!"
+EOF
+
+chmod +x /opt/network-rag-system/deploy/deploy.sh
+
+# 停止スクリプト
+tee /opt/network-rag-system/deploy/stop.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Stop Services Script
+
+echo "Stopping Network RAG System services..."
+
+sudo systemctl stop network-rag-system
+sudo systemctl stop openhands
+
+echo "All services stopped."
+EOF
+
+chmod +x /opt/network-rag-system/deploy/stop.sh
+
+# バックアップスクリプト
+tee /opt/network-rag-system/deploy/backup.sh > /dev/null << 'EOF'
+#!/bin/bash
+# Backup Script
+
+BACKUP_DIR="/var/lib/network-rag-system/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="network_rag_backup_$DATE.tar.gz"
+
+echo "Creating backup: $BACKUP_FILE"
+
+# バックアップの作成
+tar -czf "$BACKUP_DIR/$BACKUP_FILE" \
+  --exclude="*.log" \
+  --exclude="temp/*" \
+  --exclude="backups/*" \
+  /opt/network-rag-system \
+  /etc/network-rag-system \
+  /var/lib/network-rag-system
+
+# 古いバックアップの削除（30日以上前）
+find "$BACKUP_DIR" -name "network_rag_backup_*.tar.gz" -mtime +30 -delete
+
+echo "Backup completed: $BACKUP_DIR/$BACKUP_FILE"
+EOF
+
+chmod +x /opt/network-rag-system/deploy/backup.sh
+```
+
+##### 7.2 定期バックアップの設定
+```bash
+# 定期バックアップの設定
+(crontab -l 2>/dev/null; echo "0 2 * * * /opt/network-rag-system/deploy/backup.sh") | crontab -
+(crontab -l 2>/dev/null; echo "0 3 * * * sudo systemctl restart network-rag-system") | crontab -
+```
+
+#### 8. 最終確認
+
+##### 8.1 システムの状態確認
+```bash
+# 全サービスの状態確認
+sudo systemctl list-units --type=service --state=running | grep -E "(network-rag|openhands)"
+
+# リソース使用状況の確認
+htop
+
+# ディスク使用状況の確認
+df -h
+```
+
+##### 8.2 アクセス方法
+```bash
+# APIアクセス方法
+echo "Network RAG System API: http://$(hostname -I | awk '{print $1}'):8000"
+echo "OpenHands API: http://$(hostname -I | awk '{print $1}'):8001"
+
+# サービス管理方法
+echo "Service management:"
+echo "  sudo systemctl start network-rag-system"
+echo "  sudo systemctl stop network-rag-system"
+echo "  sudo systemctl restart network-rag-system"
+echo "  sudo systemctl status network-rag-system"
+```
+
+### サービス管理コマンド
+
+#### サービスの起動・停止・再起動
+```bash
+# サービスの起動
+sudo systemctl start network-rag-system
+sudo systemctl start openhands
+
+# サービスの停止
+sudo systemctl stop network-rag-system
+sudo systemctl stop openhands
+
+# サービスの再起動
+sudo systemctl restart network-rag-system
+sudo systemctl restart openhands
+
+# サービスの状態確認
+sudo systemctl status network-rag-system
+sudo systemctl status openhands
+
+# サービスの有効化・無効化
+sudo systemctl enable network-rag-system    # 起動時に自動起動
+sudo systemctl disable network-rag-system   # 起動時に自動起動しない
+```
+
+#### ログの確認
+```bash
+# systemdサービスログの確認
+sudo journalctl -u network-rag-system -f
+sudo journalctl -u openhands -f
+
+# アプリケーションログの確認
+tail -f /var/log/network-rag-system/app.log
+tail -f /var/log/network-rag-system/openhands.log
+tail -f /var/log/network-rag-system/rag_api.log
+tail -f /var/log/network-rag-system/kb_updater.log
+```
+
+#### バックアップと復元
+```bash
+# バックアップの作成
+sudo /opt/network-rag-system/deploy/backup.sh
+
+# バックアップの一覧
+ls -la /var/lib/network-rag-system/backups/
+
+# バックアップからの復元
+sudo systemctl stop network-rag-system
+sudo tar -xzf /var/lib/network-rag-system/backups/network_rag_backup_YYYYMMDD_HHMMSS.tar.gz -C /
+sudo systemctl start network-rag-system
+```
+
+### トラブルシューティング
+
+#### サービス起動時の問題
+```bash
+# サービスの詳細なログ確認
+sudo journalctl -u network-rag-system --no-pager -n 50
+sudo journalctl -u openhands --no-pager -n 50
+
+# 依存関係の確認
+sudo systemctl list-dependencies network-rag-system
+sudo systemctl list-dependencies openhands
+
+# ポートの競合確認
+sudo netstat -tulpn | grep -E ":800[01]"
+```
+
+#### パーミッションの問題
+```bash
+# パーミッションの確認と修正
+sudo chown -R $USER:$USER /opt/network-rag-system
+sudo chown -R $USER:$USER /var/log/network-rag-system
+sudo chown -R $USER:$USER /etc/network-rag-system
+sudo chown -R $USER:$USER /var/lib/network-rag-system
+
+# 実行権限の確認
+ls -la /opt/network-rag-system/start_service.sh
+ls -la /opt/openhands/start_service.sh
+```
+
+#### ネットワーク接続の問題
+```bash
+# ファイアウォールの状態確認
+sudo ufw status
+
+# ポートの開放
+sudo ufw allow 8000/tcp
+sudo ufw allow 8001/tcp
+
+# ネットワーク接続の確認
+curl -v http://localhost:8000/health
+curl -v http://localhost:8001/health
+```
+
+### カスタマイズ
+
+#### 設定ファイルの編集
+```bash
+# Network RAG System設定の編集
+sudo nano /etc/network-rag-system/config.yml
+
+# OpenHands設定の編集
+nano ~/.openhands/config.yml
+
+# ログレベルの変更
+# logging:
+#   level: DEBUG  # 開発時はDEBUGに変更
+```
+
+#### 自動更新設定の変更
+```bash
+# 自動更新間隔の変更（1時間 → 30分）
+sudo sed -i 's/interval: 3600/interval: 1800/' /etc/network-rag-system/config.yml
+
+# バッチサイズの変更
+sudo sed -i 's/batch_size: 5/batch_size: 10/' /etc/network-rag-system/config.yml
+```
+
+### まとめ
+
+このデプロイガイドにより、以下の環境が構築されます：
+
+- ✅ **Network RAG System**: APIサーバーとKB更新機能
+- ✅ **OpenHands**: LLMエージェントとの連携機能
+- ✅ **自動更新**: 定期的なKB更新機能
+- ✅ **バックアップ**: 自動バックアップ機能
+- ✅ **監視**: サービス監視とログ管理
+- ✅ **セキュリティ**: ファイアウォールとアクセス制御
+
+デプロイが完了したら、以下のURLでサービスにアクセスできます：
+
+- **Network RAG System API**: `http://サーバーのIPアドレス:8000`
+- **OpenHands API**: `http://サーバーのIPアドレス:8001`
+
+KB更新機能を使用するには、`python run_kb_update.py` コマンドを使用してください。
+
 ## 🤝 貢献
 
 貢献歓迎！詳細は[貢献ガイド](docs/CONTRIBUTING.md)を参照してください。
