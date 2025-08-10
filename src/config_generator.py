@@ -10,8 +10,8 @@ import os
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
-from knowledge_base import KnowledgeBase, DevicePolicy
-from rag_system import NetworkRAGSystem
+from .knowledge_base import KnowledgeBase, DevicePolicy
+from .rag_system import NetworkRAGSystem
 
 @dataclass
 class GeneratedConfig:
