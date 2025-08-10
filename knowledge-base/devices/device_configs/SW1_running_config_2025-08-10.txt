@@ -1,0 +1,116 @@
+
+
+# Device Configuration Metadata
+# Device: SW1
+# Type: Switch
+# OS: Cisco IOS XE
+# Model: C9500-24Y4C
+# Config Type: running_config
+# Date: 2025-08-10
+# Version: 16.9.3
+# Contact: network-admin@company.com
+# Description: Production core switch configuration
+
+! 基本設定
+hostname SW1
+ip routing
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no ip domain-lookup
+ip domain-name company.local
+
+! NTP設定
+ntp server 192.168.1.1 prefer
+ntp server 192.168.1.2
+
+! DNS設定
+ip name-server 8.8.8.8
+ip name-server 8.8.4.4
+
+! 特権EXECモードパスワード
+enable secret $1$secret$
+
+! VTYコンソール設定
+line con 0
+ exec-timeout 0 0
+ logging synchronous
+line vty 0 4
+ login local
+line vty 5 15
+ login local
+
+! ローカルユーザー設定
+username admin privilege 15 secret $1$admin$
+username monitor privilege 1 secret $1$monitor$
+
+! VLAN設定
+vlan 10
+ name Management
+vlan 20
+ name Sales
+vlan 30
+ name Development
+
+! インターフェース設定
+interface Vlan10
+ description Management Network
+ ip address 192.168.100.10 255.255.255.0
+
+interface Vlan20
+ description Sales Network
+ ip address 10.1.20.1 255.255.255.0
+
+interface Vlan30
+ description Development Network
+ ip address 10.1.30.1 255.255.255.0
+
+! ポートチャネル設定
+interface Port-channel1
+ description Uplink to R1
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20,30,40
+
+interface range GigabitEthernet1/1-2
+ channel-group 1 mode active
+
+! OSPF設定
+router ospf 1
+ router-id 10.1.10.10
+ log-adjacency-changes
+ network 10.1.10.0 0.0.0.255 area 0
+ network 192.168.100.0 0.0.0.255 area 0
+ passive-interface Vlan10
+ passive-interface Vlan20
+ passive-interface Vlan30
+
+! セキュリティ設定
+ip access-list extended INBOUND_ACL
+ permit tcp 10.1.20.0 0.0.0.255 10.1.30.0 0.0.0.255 eq 22
+ permit tcp 10.1.30.0 0.0.0.255 10.1.20.0 0.0.0.255 eq 22
+ deny   ip any any
+
+! ACL適用
+interface Vlan20
+ ip access-group INBOUND_ACL in
+
+! SSH設定
+ip domain-name company.local
+crypto key generate rsa modulus 2048
+line vty 0 15
+ transport input ssh
+
+! SNMP設定
+snmp-server community "public_ro" RO
+snmp-server community "private_rw" RW
+snmp-server host 192.168.1.100 version 2c "public_ro"
+
+! Syslog設定
+logging host 192.168.1.200
+logging trap 6
+logging buffered 8192
+logging origin-id hostname
+
+! 保存設定
+end
+write memory
+
