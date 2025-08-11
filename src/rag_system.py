@@ -77,7 +77,7 @@ class NetworkRAGSystem:
     def _extract_device_name(self, query: str) -> Optional[str]:
         """デバイス名の抽出"""
         # クエリからデバイス名を抽出
-        device_pattern = r'(?:R1|R2|SW1|router|switch)'
+        device_pattern = r'\b(R1|R2|SW1)\b'
         match = re.search(device_pattern, query, re.IGNORECASE)
         return match.group(0).upper() if match else None
     
@@ -147,21 +147,28 @@ class NetworkRAGSystem:
         """関連テンプレートの検索"""
         relevant_templates = []
         
-        # クエリに基づいて関連テンプレートを検索
-        template_patterns = {
-            'router': r'router|ルータ',
-            'switch': r'switch|スイッチ',
-            'interface': r'interface|インターフェース',
-            'ospf': r'ospf|ルーティング'
-        }
+        # クエリの単語を抽出
+        query_words = set(re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+', query.lower()))
         
-        for template_name, template_content in self.kb.templates.items():
-            for pattern, keyword in template_patterns.items():
-                if re.search(keyword, query, re.IGNORECASE) and pattern in template_name:
-                    relevant_templates.append(template_name)
-                    break
+        # 関連デバイスポリシーを取得
+        relevant_policies = self._find_relevant_policies(query)
         
-        return relevant_templates
+        for device_name in relevant_policies:
+            policy = self.kb.get_device_policy(device_name)
+            if policy and policy.template_name:
+                relevant_templates.append(policy.template_name)
+        
+        # クエリに基づいて直接テンプレートを検索
+        for template_name, template in self.kb.templates.items():
+            # テンプレート名と内容の両方を検索
+            template_text = f"{template_name} {template.content}".lower()
+            template_words = set(re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+', template_text))
+            
+            # 関連性判定
+            if query_words.intersection(template_words):
+                relevant_templates.append(template_name)
+        
+        return list(set(relevant_templates))
     
     def _find_relevant_rules(self, query: str) -> Dict[str, Any]:
         """関連検証ルールの検索"""
@@ -300,5 +307,14 @@ class NetworkRAGSystem:
     def clear_history(self):
         """クエリ履歴のクリア"""
         self.query_history.clear()
+    
+    def _is_relevant(self, query: str, text: str) -> bool:
+        """クエリとテキストの関連性判定"""
+        # クエリとテキストの単語を比較（日本語対応）
+        query_words = set(re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+', query.lower()))
+        text_words = set(re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+', text.lower()))
+        
+        # 共通する単語があるか判定
+        return len(query_words.intersection(text_words)) > 0
 
 

@@ -20,6 +20,14 @@ class DevicePolicy:
     security_config: Dict[str, Any]
     ha_config: Dict[str, Any]
     monitoring_config: Dict[str, Any]
+    template_name: Optional[str] = None
+
+
+@dataclass
+class Template:
+    name: str
+    content: str
+
 
 class KnowledgeBase:
     def __init__(self, kb_dir: str = "/workspace/network-rag-system/knowledge-base"):
@@ -70,6 +78,13 @@ class KnowledgeBase:
         ha_config = self._extract_ha_config(content)
         monitoring_config = self._extract_monitoring_config(content)
         
+        # デバイスタイプに基づいてテンプレート名を決定
+        template_name = None
+        if device_type in ["ルーター", "router"]:
+            template_name = "router-template"
+        elif device_type in ["L2/L3スイッチ", "switch"]:
+            template_name = "switch-template"
+        
         return DevicePolicy(
             hostname=hostname,
             device_type=device_type,
@@ -78,33 +93,70 @@ class KnowledgeBase:
             ospf_config=ospf_config,
             security_config=security_config,
             ha_config=ha_config,
-            monitoring_config=monitoring_config
+            monitoring_config=monitoring_config,
+            template_name=template_name
         )
     
     def _extract_field(self, content: str, field_name: str) -> str:
         """フィールドの抽出"""
+        # 1. 標準的な「フィールド名: 値」形式の検索
         pattern = rf"{field_name}[:：]\s*(.+)"
         match = re.search(pattern, content)
-        return match.group(1).strip() if match else ""
+        if match:
+            return match.group(1).strip()
+        
+        # 2. リスト形式の検索（例: **タイプ**: ルーター）
+        list_pattern = rf"\*\*{field_name}\*\*[:：]\s*(.+)"
+        match = re.search(list_pattern, content)
+        if match:
+            return match.group(1).strip()
+        
+        # 3. ポリシー要件からの抽出（例: **基本設定**: ホスト名はR1）
+        requirement_pattern = rf"\*\*{field_name}\*\*[:：]\s*[^:]+?は\s*([^、\s]+)"
+        match = re.search(requirement_pattern, content)
+        if match:
+            return match.group(1).strip()
+        
+        # 4. 特殊なケースの処理
+        if field_name == "ホスト名":
+            # 「ホスト名はR1」のような形式
+            hostname_pattern = r"ホスト名は(\w+)"
+            match = re.search(hostname_pattern, content)
+            if match:
+                return match.group(1).strip()
+        
+        if field_name == "デバイスタイプ":
+            # 「**タイプ**: ルーター」のような形式から値を抽出
+            type_pattern = r"\*\*タイプ\*\*\s*[:：]\s*(.+)"
+            match = re.search(type_pattern, content)
+            if match:
+                return match.group(1).strip()
+        
+        if field_name == "IPアドレス":
+            # IPアドレスの抽出
+            ip_pattern = r"(\d+\.\d+\.\d+\.\d+/\d+)"
+            match = re.search(ip_pattern, content)
+            if match:
+                return match.group(1).strip()
+        
+        return ""
     
     def _extract_interfaces(self, content: str) -> List[str]:
         """インターフェース設定の抽出"""
         interfaces = []
-        pattern = r"[*][*][*]インターフェース設定[*][*][*](.*?)([*][*][*]|$)"
-        match = re.search(pattern, content, re.DOTALL)
+        
+        # 特殊要件セクションからインターフェースを抽出
+        interface_pattern = r"## 特殊要件(.*?)(## |$)"
+        match = re.search(interface_pattern, content, re.DOTALL)
         
         if match:
             interface_section = match.group(1)
-            # インターフェース行の抽出
-            interface_pattern = r"-[*][*][*](.*?)[*][*][*]"
-            interface_matches = re.findall(interface_pattern, interface_section, re.DOTALL)
+            # インターフェース名を抽出（例: GigabitEthernet0/0/0, Loopback0）
+            interface_name_pattern = r"は\s*(GigabitEthernet\d+/\d+/\d+|Loopback\d+)"
+            interface_matches = re.findall(interface_name_pattern, interface_section)
             
-            for interface_match in interface_matches:
-                lines = interface_match.strip().split('\n')
-                for line in lines:
-                    line = line.strip()
-                    if line and not line.startswith('-'):
-                        interfaces.append(line)
+            for interface in interface_matches:
+                interfaces.append(interface)
         
         return interfaces
     
@@ -185,7 +237,7 @@ class KnowledgeBase:
         if templates_dir.exists():
             for template_file in templates_dir.glob("*.txt"):
                 with open(template_file, 'r', encoding='utf-8') as f:
-                    self.templates[template_file.stem] = f.read()
+                    self.templates[template_file.stem] = Template(template_file.stem, f.read())
     
     def _load_validation_rules(self):
         """検証ルールの読み込み"""
@@ -222,6 +274,30 @@ class KnowledgeBase:
     def list_devices(self) -> List[str]:
         """デバイスリストの取得"""
         return list(self.policies.keys())
+    
+    def search_policies(self, query: str) -> List[str]:
+        """ポリシーの検索"""
+        relevant_policies = []
+        
+        # クエリの単語を抽出
+        query_words = set(re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+', query.lower()))
+        
+        for device_name, policy in self.policies.items():
+            # ポリシー内容をテキスト化
+            policy_text = f"{policy.hostname} {policy.device_type} {policy.ip_address} {policy.interfaces}"
+            
+            # ポリシーテンプレートの内容を追加
+            if policy.template_name:
+                template = self.templates.get(policy.template_name)
+                if template:
+                    policy_text += f" {template.content}"
+            
+            # 関連性判定
+            policy_words = set(re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+', policy_text.lower()))
+            if query_words.intersection(policy_words):
+                relevant_policies.append(device_name)
+        
+        return relevant_policies
     
     def get_network_summary(self) -> Dict[str, Any]:
         """ネットワークサマリーの取得"""

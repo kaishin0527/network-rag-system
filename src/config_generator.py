@@ -69,6 +69,8 @@ class NetworkConfigGenerator:
         template = self.kb.get_template("router-template")
         if not template:
             template = self._get_default_template()
+        else:
+            template = template.content
         
         # テンプレートの変数置換
         config_content = self._substitute_template_variables(template, device_name, prompt)

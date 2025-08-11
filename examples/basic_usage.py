@@ -5,11 +5,11 @@
 # basic_usage.py
 import sys
 import os
-sys.path.append('/workspace/network-rag-system/src')
+sys.path.append('/workspace/network-rag-system')
 
-from rag_system import NetworkRAGSystem
-from config_generator import NetworkConfigGenerator
-from knowledge_base import KnowledgeBase
+from src.rag_system import NetworkRAGSystem
+from src.config_generator import NetworkConfigGenerator
+from src.knowledge_base import KnowledgeBase
 
 def main():
     print("=== Network RAG System - Basic Usage Example ===\n")
