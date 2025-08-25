@@ -1,0 +1,105 @@
+
+
+# OpenHands Configuration
+openhands:
+  api_url: "http://localhost:8001"
+  api_key: "${OPENHANDS_API_KEY:-default_api_key}"
+  timeout: 30
+  max_retries: 3
+
+# LLM Configuration
+llm:
+  # Local LLM (Ollama) settings
+  local:
+    enabled: true
+    api_url: "http://localhost:11434"
+    model: "llama2"
+    temperature: 0.7
+    max_tokens: 2000
+    timeout: 60
+    system_prompt: "You are a network configuration expert specializing in Cisco IOS, IOS-XE, and IOS-XR devices."
+    # IP指定機能: 複数のLLMサーバーをサポート
+    endpoints:
+      - url: "http://localhost:11434"
+        priority: 1
+        verify_ssl: false
+        api_key: "${LOCAL_LLM_API_KEY:-}"
+      - url: "http://192.168.1.100:11434"
+        priority: 2
+        verify_ssl: false
+        api_key: "${LOCAL_LLM_API_KEY_ALT:-}"
+        backup: true
+  
+  # OpenAI settings (fallback)
+  openai:
+    enabled: false
+    api_url: "https://api.openai.com/v1"
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4"
+    temperature: 0.7
+    max_tokens: 2000
+    timeout: 30
+    # IP指定機能: 複数のエンドポイントをサポート
+    endpoints:
+      - url: "https://api.openai.com/v1"
+        priority: 1
+        verify_ssl: true
+        api_key: "${OPENAI_API_KEY}"
+      - url: "https://api.openai.eu/v1"
+        priority: 2
+        verify_ssl: true
+        api_key: "${OPENAI_API_KEY}"
+        backup: true
+  
+  # Anthropic settings (fallback)
+  anthropic:
+    enabled: false
+    api_url: "https://api.anthropic.com"
+    api_key: "${ANTHROPIC_API_KEY}"
+    model: "claude-3-sonnet-20240229"
+    temperature: 0.7
+    max_tokens: 2000
+    timeout: 30
+    # IP指定機能: 複数のエンドポイントをサポート
+    endpoints:
+      - url: "https://api.anthropic.com"
+        priority: 1
+        verify_ssl: true
+        api_key: "${ANTHROPIC_API_KEY}"
+      - url: "https://api.anthropic.eu"
+        priority: 2
+        verify_ssl: true
+        api_key: "${ANTHROPIC_API_KEY}"
+        backup: true
+  
+  # LLM接続管理設定
+  connection:
+    enable_health_check: true
+    health_check_interval: 30
+    health_check_timeout: 5
+    max_retries: 3
+    retry_delay: 1
+    enable_caching: true
+    cache_ttl: 3600
+    enable_rate_limit: true
+    rate_limit_per_minute: 60
+    enable_fallback: true
+    enable_monitoring: true
+    log_usage: true
+    track_tokens: true
+
+# Network RAG System Configuration
+network_rag:
+  kb_dir: "/workspace/network-rag-system/knowledge-base"
+  default_device: "R1"
+  supported_config_types:
+    - "basic"
+    - "routing"
+    - "switching"
+    - "security"
+    - "monitoring"
+  validation_rules:
+    enable_syntax_check: true
+    enable_security_check: true
+    enable_best_practice_check: true
+
