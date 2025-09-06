@@ -22,7 +22,7 @@ class QueryContext:
 class NetworkRAGSystem:
     def __init__(self, kb_dir: str = "/workspace/network-rag-system/knowledge-base"):
         self.kb = KnowledgeBase(kb_dir)
-        self.query_history = []
+        self.query_history: List[str] = []
     
     def retrieve_relevant_info(self, query: str) -> Dict[str, Any]:
         """関連情報の検索"""
@@ -208,11 +208,8 @@ class NetworkRAGSystem:
         prompt = self._build_prompt(relevant_info)
         
         # クエリ履歴に追加
-        self.query_history.append({
-            'query': query,
-            'timestamp': str(datetime.now()),
-            'relevant_info': relevant_info
-        })
+        self.query_history.append(f"{query} - {str(datetime.now())}")
+
         
         return prompt
     
@@ -300,16 +297,16 @@ class NetworkRAGSystem:
         
         return prompt
     
-    def get_query_history(self) -> List[Dict[str, Any]]:
+    def get_query_history(self) -> List[str]:
         """クエリ履歴の取得"""
         return self.query_history
     
-    def clear_history(self):
+    def clear_history(self) -> None:
         """クエリ履歴のクリア"""
         self.query_history.clear()
     
-    def _is_relevant(self, query: str, text: str) -> bool:
-        """クエリとテキストの関連性判定"""
+    def _is_relevant_advanced(self, query: str, text: str) -> bool:
+        """クエリとテキストの関連性判定（高度版）"""
         # クエリとテキストの単語を比較（日本語対応）
         query_words = set(re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+', query.lower()))
         text_words = set(re.findall(r'[a-zA-Z0-9]+|[\u3040-\u309f]+|[\u30a0-\u30ff]+', text.lower()))

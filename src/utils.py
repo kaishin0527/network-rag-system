@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 from datetime import datetime
 
-def load_config_file(file_path: str) -> Dict[str, Any]:
+def load_config_file(file_path: str) -> Any:
     """設定ファイルの読み込み"""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -222,18 +222,19 @@ def calculate_network_stats(configs: List[str]) -> Dict[str, Any]:
     
     for config in configs:
         lines = config.split('\n')
-        stats['total_lines'] += len(lines)
+        stats['total_lines'] += int(len(lines))
         
         # IPアドレスの抽出
         ip_pattern = r'ip address (\d+\.\d+\.\d+\.\d+/\d+)'
         ip_matches = re.findall(ip_pattern, config)
-        stats['ip_addresses'].extend(ip_matches)
+        stats['ip_addresses'] = stats.get('ip_addresses', []) + list(ip_matches)
         
         # プロトコルの抽出
         protocol_pattern = r'router (\w+)'
         protocol_matches = re.findall(protocol_pattern, config)
         for protocol in protocol_matches:
-            if protocol not in stats['protocols']:
+            if protocol not in stats.get('protocols', {}):
+                stats['protocols'] = stats.get('protocols', {})
                 stats['protocols'][protocol] = 0
             stats['protocols'][protocol] += 1
     
@@ -274,7 +275,7 @@ def format_file_size(size_bytes: int) -> str:
     
     size_names = ["B", "KB", "MB", "GB", "TB"]
     i = 0
-    while size_bytes >= 1024 and i < len(size_names) - 1:
+    while float(size_bytes) >= 1024 and i < len(size_names) - 1:
         size_bytes /= 1024.0
         i += 1
     

@@ -32,12 +32,12 @@ class Template:
 class KnowledgeBase:
     def __init__(self, kb_dir: str = "/workspace/network-rag-system/knowledge-base"):
         self.kb_dir = Path(kb_dir)
-        self.policies = {}
-        self.templates = {}
-        self.validation_rules = {}
+        self.policies: Dict[str, Any] = {}
+        self.templates: Dict[str, Any] = {}
+        self.validation_rules: Dict[str, Any] = {}
         self._load_knowledge_base()
     
-    def _load_knowledge_base(self):
+    def _load_knowledge_base(self) -> None:
         """知識ベースの読み込み"""
         print(f"Loading knowledge base from: {self.kb_dir}")
         
@@ -52,7 +52,7 @@ class KnowledgeBase:
         
         print("Knowledge base loaded successfully")
     
-    def _load_policies(self):
+    def _load_policies(self) -> None:
         """ポリシーの読み込み"""
         devices_dir = self.kb_dir / "devices"
         if not devices_dir.exists():
@@ -173,7 +173,7 @@ class KnowledgeBase:
         area_pattern = r"Area (\d+): ([^\n]+)"
         area_matches = re.findall(area_pattern, content)
         if area_matches:
-            ospf_config['areas'] = dict(area_matches)
+            ospf_config['areas'] = {str(k): str(v) for k, v in dict(area_matches).items()}
         
         return ospf_config
     
@@ -191,13 +191,13 @@ class KnowledgeBase:
         acl_pattern = r"ACL (\d+): ([^\n]+)"
         acl_matches = re.findall(acl_pattern, content)
         if acl_matches:
-            security_config['acls'] = dict(acl_matches)
+            security_config['acls'] = {str(k): str(v) for k, v in dict(acl_matches).items()}
         
         return security_config
     
     def _extract_ha_config(self, content: str) -> Dict[str, Any]:
         """高可用性設定の抽出"""
-        ha_config = {}
+        ha_config: Dict[str, Any] = {}
         
         # HSRP設定の抽出
         hsrp_pattern = r"Group (\d+): ([^\n]+)"
@@ -231,7 +231,7 @@ class KnowledgeBase:
         
         return monitoring_config
     
-    def _load_templates(self):
+    def _load_templates(self) -> None:
         """テンプレートの読み込み"""
         templates_dir = self.kb_dir / "automation" / "templates"
         if templates_dir.exists():
@@ -239,7 +239,7 @@ class KnowledgeBase:
                 with open(template_file, 'r', encoding='utf-8') as f:
                     self.templates[template_file.stem] = Template(template_file.stem, f.read())
     
-    def _load_validation_rules(self):
+    def _load_validation_rules(self) -> None:
         """検証ルールの読み込み"""
         validation_file = self.kb_dir / "automation" / "validation-rules.yaml"
         if validation_file.exists():
@@ -275,8 +275,8 @@ class KnowledgeBase:
         """デバイスリストの取得"""
         return list(self.policies.keys())
     
-    def search_policies(self, query: str) -> List[str]:
-        """ポリシーの検索"""
+    def search_policies_advanced(self, query: str) -> List[str]:
+        """ポリシーの高度検索"""
         relevant_policies = []
         
         # クエリの単語を抽出
@@ -301,19 +301,19 @@ class KnowledgeBase:
     
     def get_network_summary(self) -> Dict[str, Any]:
         """ネットワークサマリーの取得"""
-        summary = {
+        summary: Dict[str, Any] = {
             'total_devices': len(self.policies),
             'device_types': {},
             'ip_addresses': [],
             'ospf_areas': set(),
             'last_updated': datetime.now().isoformat()
-        }
+            }
         
         for policy in self.policies.values():
             # デバイスタイプの集計
             if policy.device_type not in summary['device_types']:
                 summary['device_types'][policy.device_type] = 0
-            summary['device_types'][policy.device_type] += 1
+            summary['device_types'][policy.device_type] = int(summary['device_types'][policy.device_type]) + 1
             
             # IPアドレスの収集
             summary['ip_addresses'].append(policy.ip_address)

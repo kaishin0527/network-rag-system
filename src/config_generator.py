@@ -26,7 +26,7 @@ class NetworkConfigGenerator:
     def __init__(self, kb_dir: str = "/workspace/network-rag-system/knowledge-base"):
         self.kb = KnowledgeBase(kb_dir)
         self.rag_system = NetworkRAGSystem(kb_dir)
-        self.generated_configs = []
+        self.generated_configs: List[Dict[str, Any]] = []
     
     def generate_config(self, query: str) -> GeneratedConfig:
         """コンフィグの生成"""
@@ -70,7 +70,9 @@ class NetworkConfigGenerator:
         if not template:
             template = self._get_default_template()
         else:
-            template = template.content
+            # templateがオブジェクトの場合はcontent属性を取得、strの場合はそのまま使用
+            if hasattr(template, 'content'):
+                template = template.content
         
         # テンプレートの変数置換
         config_content = self._substitute_template_variables(template, device_name, prompt)
@@ -217,7 +219,7 @@ ntp server 192.168.100.100
     
     def _validate_config(self, config_content: str) -> Dict[str, Any]:
         """コンフィグの検証"""
-        validation_result = {
+        validation_result: Dict[str, Any] = {
             'is_valid': True,
             'errors': [],
             'warnings': [],
@@ -262,7 +264,7 @@ ntp server 192.168.100.100
     
     def _validate_ip_addresses(self, config_content: str) -> Dict[str, Any]:
         """IPアドレスの検証"""
-        validation = {
+        validation: Dict[str, Any] = {
             'is_valid': True,
             'errors': [],
             'warnings': [],
@@ -284,10 +286,11 @@ ntp server 192.168.100.100
     
     def _validate_ospf_config(self, config_content: str) -> Dict[str, Any]:
         """OSPF設定の検証"""
-        validation = {
+        validation: Dict[str, Any] = {
             'is_valid': True,
             'errors': [],
             'warnings': [],
+            'ip_addresses': [],
             'areas': []
         }
         
@@ -357,7 +360,7 @@ ntp server 192.168.100.100
         
         return 'general'
     
-    def get_generated_configs(self) -> List[GeneratedConfig]:
+    def get_generated_configs(self) -> List[Dict[str, Any]]:
         """生成されたコンフィグの取得"""
         return self.generated_configs
     

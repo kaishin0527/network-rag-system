@@ -30,7 +30,7 @@ class NetworkConfigAgent(Agent):
         self.rag_system = None  # 後で初期化
         self.config_generator = None  # 後で初期化
     
-    def _load_config(self, config_path: str) -> Dict[str, Any]:
+    def _load_config(self, config_path: str) -> Any:
         """設定ファイルの読み込み"""
         try:
             with open(config_path, 'r') as f:
